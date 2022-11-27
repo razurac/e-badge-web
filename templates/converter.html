@@ -2,7 +2,105 @@
 <html>
   <head>
     <title>EPD-WEB Converter</title>
+    <style>
+      .slidecontainer {
+        width: 50%;
+      }
+      
+      .slider {
+        -webkit-appearance: none;
+        width: 100%;
+        height: 15px;
+        border-radius: 5px;
+        background: #d3d3d3;
+        outline: none;
+        opacity: 0.7;
+        -webkit-transition: .2s;
+        transition: opacity .2s;
+      }
+      
+      .slider:hover {
+        opacity: 1;
+      }
+      
+      .slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 25px;
+        height: 25px;
+        border-radius: 50%;
+        background: #04AA6D;
+        cursor: pointer;
+      }
+      
+      .slider::-moz-range-thumb {
+        width: 25px;
+        height: 25px;
+        border-radius: 50%;
+        background: #04AA6D;
+        cursor: pointer;
+      }
+      </style>
   </head>
   <body>
+    <h1>File Upload</h1>
+    Please Upload a file to be converted.<br><br>
+    <form method="POST" action="" enctype="multipart/form-data">
+      <label for="file">Image:</label>
+      <input id="file" type="file" name="file">
+      <br>
+      <div class="slidecontainer">
+      <label for="threshold">Threshold:</label>
+      <input type="range" min="1" max="256" value="125" class="slider" name="threshold" id="threshold"><br>
+      Value: <span id="threshold_out"></span>
+      </div>
+      <br>
+      <div class="slidecontainer">
+      <label for="threshold">Threshold Offset:</label>
+      <input type="range" min="1" max="256" value="10" class="slider" name="threshold_off" id="threshold_off"><br>
+      Value: <span id="threshold_off_out"></span>
+      </div>
+      <br>
+      <label for="rotation">Rotate picture:</label>
+      <select id="rotation" name="rotation">
+        <option value="0">0°</option>
+        <option value="90">90°</option>
+        <option value="180">180°</option>
+        <option value="270">270°</option>
+      </select>
+      <br>
+      <input type="checkbox" id="bicolor" name="bicolor" value="True">
+      <label for="bicolor">Bicolor</label>
+      <br>
+      <input type="checkbox" id="swap" name="swap" value="True">
+      <label for="swap">Swap B/R</label>
+      <br>
+      <input type="checkbox" id="invert" name="invert" value="True">
+      <label for="invert">Invert color</label>
+      <br>
+      <input type="submit" value="Submit">
+    </form>
+
+
+
+    <script>
+      var slider_threshold = document.getElementById("threshold");
+      var output_threshold = document.getElementById("threshold_out");
+      var slider_threshold_off = document.getElementById("threshold_off");
+      var output_threshold_off = document.getElementById("threshold_off_out");
+      output_threshold.innerHTML = slider_threshold.value;
+      
+      slider_threshold.oninput = function() {
+        output_threshold.innerHTML = this.value;
+      }
+
+      output_threshold_off.innerHTML = slider_threshold_off.value;
+      
+      slider_threshold_off.oninput = function() {
+        output_threshold_off.innerHTML = this.value;
+      }
+
+      </script>
+
   </body>
 </html>

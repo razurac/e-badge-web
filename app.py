@@ -50,9 +50,32 @@ def load_prepared_image(loadedFiles):
         image_r = Image.new('1', (epd4in2b.EPD_WIDTH, epd4in2b.EPD_HEIGHT), 255)
     return image_b, image_r
 
-def push_image(pic):
+def convert_image(file, threshold, threshold_off, rotation, bicolor, invert):
+    image_file = Image.open(file)
+    size = (epd4in2b.EPD_WIDTH, epd4in2b.EPD_HEIGHT)
+    if rotation != 0:
+        image_file = image_file.rotate(rotation)
+    image_file = ImageOps.fit(image_file, size, Image.HAMMING, centering=(0.0, 0.5))
+    image_file = image_file.convert('L')
+    image_b = image_file.point(lambda p: p > threshold and 255)
+    if invert and not bicolor:
+        image_b = ImageOps.invert(image_b)
+
+    if bicolor:
+        print("Bicolor is on")
+        image_r = image_file.point(lambda p: p > threshold + threshold_off and 255)
+        image_r = ImageOps.invert(image_r)
+        return image_b, image_r
+
+    image_r = Image.new('1', (epd4in2b.EPD_WIDTH, epd4in2b.EPD_HEIGHT), 255)
+    return image_b, image_r
+
+def push_image(pic, swap=False):
     image_b = pic[0].convert('L')
     image_r = pic[1].convert('L')
+
+    if swap:
+        image_b, image_r = image_r, image_b
 
     try:
         epd = epd4in2b.EPD()
@@ -89,6 +112,34 @@ def queue_handler():
                 clear_screen()
 
                 print("Screen cleared")
+            elif job["type"] == "convert":
+                print("Convert image")
+                file = job["file"]
+                threshold = int(job["options"]["threshold"])
+                threshold_off = int(job["options"]["threshold_off"])
+                rotation = int(job["options"]["rotation"])
+                if "bicolor" in job["options"]:
+                    bicolor = True
+                else:
+                    bicolor = False
+                if "swap" in job["options"]:
+                    swap = True
+                else:
+                    swap = False
+                if "invert" in job["options"]:
+                    invert = True
+                else:
+                    invert = False
+                
+                picture = convert_image(file=file,
+                                    threshold=threshold,
+                                    bicolor=bicolor,
+                                    threshold_off=threshold_off,
+                                    rotation=rotation,
+                                    invert=invert)
+                push_image(picture, swap)
+                
+                print("Image displayed")
             else:
                 pass
         except:
@@ -113,8 +164,8 @@ def loader():
 @application.route('/loader', methods=['POST'])
 def loaderUpload():
     if ('file_b' not in request.files) or ('file_r' not in request.files):
-        print("No image in request")
-        return 'No image in request',400
+        print("No file in request")
+        return 'No file in request',400
     files = {}
     for file in request.files:
         if request.files[file].filename != '' and allowed_file(request.files[file].filename, ALLOWED_EXTENSIONS_PREPARED):
@@ -138,6 +189,24 @@ def loaderUpload():
 @application.route('/converter')
 def converter():
     return render_template('converter.html')
+
+@application.route('/converter', methods=['POST'])
+def converterUpload():
+    if 'file' not in request.files:
+        print("No file in request")
+        return 'No file in request',400
+    file = request.files['file']
+    if file.filename != '' and allowed_file(file.filename, ALLOWED_EXTENSIONS_GENERAL):
+        file.save(os.path.join("images/", file.filename))
+        job = {}
+        job["file"] = os.path.join("images/", file.filename)
+        job["options"] = request.form
+        job["type"] = "convert"
+        displayQueue.put(job)
+        return redirect(request.url)
+    else:
+        print("No file selected or invalid file type")
+        return 'No file selected or invalid file type',400
 
 @application.route('/clear')
 def clear():
