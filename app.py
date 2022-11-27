@@ -10,23 +10,40 @@ import time
 import threading
 import traceback
 import queue
+import socket
 from waveshare_epd import epd4in2b_V2 as epd4in2b
 
-host="0.0.0.0"
-port=8080
+####
+#  Setup
+####
+
+# Vars
+
+defaults = {"location": [0,0],
+            "font_file": "font/open-sans/bold.ttf",
+            "text_size": 20}
+
+config =   {"host": "0.0.0.0",
+            "port": 8080,
+            "ALLOWED_EXTENSIONS_GENERAL": set(['png', 'jpg', 'jpeg']),
+            "ALLOWED_EXTENSIONS_PREPARED": set(['bmp'])}
+
+# Objects
 
 epd = epd4in2b.EPD()
 displayQueue = queue.Queue()
 
-ALLOWED_EXTENSIONS_GENERAL=set(['png', 'jpg', 'jpeg'])
-ALLOWED_EXTENSIONS_PREPARED=set(['bmp'])
 
+####
+# Helpers
+####
 
-### HELPERS
+# File helpers
 def allowed_file(filename, allow_list):
     return '.' in filename and \
         filename.rsplit('.', 1)[1].lower() in allow_list
 
+# Image alignment helpers
 def refByMiddle(w, h, text, font_data):
     size = font_data.getsize(text)
 
@@ -50,6 +67,8 @@ def load_prepared_image(loadedFiles):
         image_r = Image.new('1', (epd4in2b.EPD_WIDTH, epd4in2b.EPD_HEIGHT), 255)
     return image_b, image_r
 
+# Converter for Images
+
 def convert_image(file, threshold, threshold_off, rotation, bicolor, invert):
     image_file = Image.open(file)
     size = (epd4in2b.EPD_WIDTH, epd4in2b.EPD_HEIGHT)
@@ -70,6 +89,8 @@ def convert_image(file, threshold, threshold_off, rotation, bicolor, invert):
     image_r = Image.new('1', (epd4in2b.EPD_WIDTH, epd4in2b.EPD_HEIGHT), 255)
     return image_b, image_r
 
+# Image pusher
+
 def push_image(pic, swap=False):
     image_b = pic[0].convert('L')
     image_r = pic[1].convert('L')
@@ -88,11 +109,31 @@ def push_image(pic, swap=False):
         epd.sleep()
         exit()
 
+# Screen clearer
+
 def clear_screen():
     epd.init()
     epd.Clear()
     epd.sleep()
 
+# Text writer
+
+def text_writer(text,size=defaults["text_size"],font_file=defaults["font_file"], pic="", location=defaults["location"]):
+
+    if pic == "":
+       image_b = Image.new('1', (epd4in2b.EPD_WIDTH, epd4in2b.EPD_HEIGHT), 255)
+       image_r = Image.new('1', (epd4in2b.EPD_WIDTH, epd4in2b.EPD_HEIGHT), 255)
+    else:
+        image_b = pic[0]
+        image_r = pic[1]
+
+    drawblack = ImageDraw.Draw(image_b)
+    font_data = ImageFont.truetype(font_file, size)
+    drawblack.text( (location[0], location[1]), text, font = font_data, fill = 0)
+    
+    return image_b, image_r
+
+# DisplayQueue handler
 
 def queue_handler():
     while True:
@@ -129,34 +170,42 @@ def queue_handler():
                 if "invert" in job["options"]:
                     invert = True
                 else:
-                    invert = False
-                
+                    invert = False               
                 picture = convert_image(file=file,
                                     threshold=threshold,
                                     bicolor=bicolor,
                                     threshold_off=threshold_off,
                                     rotation=rotation,
                                     invert=invert)
-                push_image(picture, swap)
-                
+                push_image(picture, swap)    
+                print("Image displayed")
+
+            elif job["type"] == "raw_display":
+                print("Show raw image")
+                raw_picture = job["raw_picture"]
+                push_image(raw_picture)
                 print("Image displayed")
             else:
                 pass
         except:
           print('traceback.format_exc():\n%s', traceback.format_exc())
           continue
-        time.sleep(10)
-
+        time.sleep(5)
 
      
 ####
 # Web-Interface
 ####
+
+# Instanciate application
 application = Flask(__name__)
+
+# Add default route
 @application.route('/')
 def index():
     return render_template('index.html')
 
+# Add loader routes
 @application.route('/loader')
 def loader():
     return render_template('loader.html')
@@ -168,7 +217,7 @@ def loaderUpload():
         return 'No file in request',400
     files = {}
     for file in request.files:
-        if request.files[file].filename != '' and allowed_file(request.files[file].filename, ALLOWED_EXTENSIONS_PREPARED):
+        if request.files[file].filename != '' and allowed_file(request.files[file].filename, config["ALLOWED_EXTENSIONS_PREPARED"]):
           files[file] = request.files[file]
     if len(files) == 0:
         print("No file selected or invalid file type")
@@ -184,8 +233,7 @@ def loaderUpload():
     return redirect(request.url)
 
 
-
-
+# Add converter routes
 @application.route('/converter')
 def converter():
     return render_template('converter.html')
@@ -196,7 +244,7 @@ def converterUpload():
         print("No file in request")
         return 'No file in request',400
     file = request.files['file']
-    if file.filename != '' and allowed_file(file.filename, ALLOWED_EXTENSIONS_GENERAL):
+    if file.filename != '' and allowed_file(file.filename, config["ALLOWED_EXTENSIONS_GENERAL"]):
         file.save(os.path.join("images/", file.filename))
         job = {}
         job["file"] = os.path.join("images/", file.filename)
@@ -208,6 +256,7 @@ def converterUpload():
         print("No file selected or invalid file type")
         return 'No file selected or invalid file type',400
 
+#Add clear route
 @application.route('/clear')
 def clear():
     job = {"type": "clear"}
@@ -215,9 +264,24 @@ def clear():
     return redirect("/")
 
 
+####
+# Startup Sequence
+####
+
+# Queue Handler
 threading.Thread(target=queue_handler).start()
-application.run(host=host, port=port, debug=True)
+time.sleep(2)
 
+# Welcome Message
+def welcome():
+    text = "Startup Completed"
+    pic = text_writer(text=text)
+    hostname=socket.gethostname()   
+    IPAddr=socket.gethostbyname(hostname)
+    pic = text_writer(text="IP: " + IPAddr, location=[0,25], pic=pic)
+    job = {"type":"raw_display", "raw_picture": pic}
+    displayQueue.put(job)
+welcome()
 
-
-
+# Web-Frontend
+application.run(host=config["host"], port=config["port"])
