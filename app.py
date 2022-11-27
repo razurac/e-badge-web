@@ -69,31 +69,69 @@ def load_prepared_image(loadedFiles):
 
 # Converter for Images
 
-def convert_image(file, threshold, threshold_off, rotation, bicolor, invert):
-    image_file = Image.open(file)
+def convert_image(file, threshold, threshold_off, rotation, bicolor, invert, dither):
+    image = Image.open(file)
+    image = image.convert('RGB',dither=Image.Dither.NONE)
     size = (epd4in2b.EPD_WIDTH, epd4in2b.EPD_HEIGHT)
-    if rotation != 0:
-        image_file = image_file.rotate(rotation)
-    image_file = ImageOps.fit(image_file, size, Image.HAMMING, centering=(0.0, 0.5))
-    image_file = image_file.convert('L')
-    image_b = image_file.point(lambda p: p > threshold and 255)
-    if invert and not bicolor:
-        image_b = ImageOps.invert(image_b)
-
-    if bicolor:
-        print("Bicolor is on")
-        image_r = image_file.point(lambda p: p > threshold + threshold_off and 255)
-        image_r = ImageOps.invert(image_r)
-        return image_b, image_r
-
+    image_b = Image.new('1', (epd4in2b.EPD_WIDTH, epd4in2b.EPD_HEIGHT), 255)
     image_r = Image.new('1', (epd4in2b.EPD_WIDTH, epd4in2b.EPD_HEIGHT), 255)
+    if rotation == 90:
+        image = image.transpose(Image.Transpose.ROTATE_90)
+    elif rotation == 180:
+        image = image.transpose(Image.Transpose.ROTATE_180)
+    elif rotation == 270:
+        image = image.transpose(Image.Transpose.ROTATE_270)
+
+    image = ImageOps.pad(image, size, Image.Resampling.HAMMING, color="#ffffff")
+
+    if dither:
+        if bicolor:
+            palette = [
+            0, 0, 0,
+            255, 0, 0,
+            255, 255, 255
+            ]
+
+            p_img = Image.new('P', size)
+            p_img.putpalette(palette * 64)
+            conv = image.quantize(palette=p_img, dither=Image.Dither.FLOYDSTEINBERG)
+            conv.save("test.png")
+
+            img_data = conv.getdata()
+            b = []
+            r = []
+            for item in img_data:
+                if item == 0:
+                    b.append(0)
+                    r.append(1)
+                elif item == 1:
+                    b.append(1)
+                    r.append(0)
+                elif item == 2:
+                    b.append(1)
+                    r.append(1)
+            image_b.putdata(b)
+            image_r.putdata(r)
+        else:
+            image_b = image.convert('L',dither=Image.Dither.FLOYDSTEINBERG)
+    else:
+        image = image.convert('L')
+        image_b = image.point(lambda p: p > threshold and 255)
+        if invert and not bicolor:
+            image_b = ImageOps.invert(image_b)
+
+        if bicolor:
+            print("Bicolor is on")
+            image_r = image.point(lambda p: p > threshold + threshold_off and 255)
+            image_r = ImageOps.invert(image_r)
+
     return image_b, image_r
 
 # Image pusher
 
 def push_image(pic, swap=False):
-    image_b = pic[0].convert('L')
-    image_r = pic[1].convert('L')
+    image_b = pic[0]
+    image_r = pic[1]
 
     if swap:
         image_b, image_r = image_r, image_b
@@ -170,13 +208,18 @@ def queue_handler():
                 if "invert" in job["options"]:
                     invert = True
                 else:
-                    invert = False               
+                    invert = False  
+                if "dither" in job["options"]:
+                    dither = True
+                else:
+                    dither = False             
                 picture = convert_image(file=file,
                                     threshold=threshold,
                                     bicolor=bicolor,
                                     threshold_off=threshold_off,
                                     rotation=rotation,
-                                    invert=invert)
+                                    invert=invert,
+                                    dither=dither)
                 push_image(picture, swap)    
                 print("Image displayed")
 
