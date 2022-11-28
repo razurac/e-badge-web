@@ -48,6 +48,19 @@ def refByMiddle(w, h, text, font_data):
     size = font_data.getsize(text)
 
     return(w - (size[0]/2), h - (size[1]/2), text, font_data)
+# Get own IP
+def get_ip():
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.settimeout(0)
+        try:
+            # doesn't even have to be reachable
+            s.connect(('10.254.254.254', 1))
+            IP = s.getsockname()[0]
+        except Exception:
+            IP = '127.0.0.1'
+        finally:
+            s.close()
+        return IP
 
 ####
 # Basic image functionality
@@ -82,7 +95,7 @@ def convert_image(file, threshold, threshold_off, rotation, bicolor, invert, dit
     elif rotation == 270:
         image = image.transpose(Image.Transpose.ROTATE_270)
 
-    image = ImageOps.pad(image, size, Image.Resampling.HAMMING, color="#ffffff")
+    image = ImageOps.pad(image, size, Image.Resampling.HAMMING, color="#000000")
 
     if dither:
         if bicolor:
@@ -321,7 +334,7 @@ def welcome():
     pic = text_writer(text=text)
     hostname=socket.gethostname()   
     IPAddr=socket.gethostbyname(hostname)
-    pic = text_writer(text="IP: " + IPAddr, location=[0,25], pic=pic)
+    pic = text_writer(text="Open Web-UI: " + get_ip()+":"+str(config["port"]), location=[0,25], pic=pic)
     job = {"type":"raw_display", "raw_picture": pic}
     displayQueue.put(job)
 welcome()

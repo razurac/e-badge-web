@@ -1,0 +1,11 @@
+[Unit]
+Description=Web-UI for e-paper display
+After=multi-user.target
+
+[Service]
+Type=idle
+WorkingDirectory=/home/pi/e-badge-web
+ExecStart=/home/pi/e-badge-web/.venv/bin/python /home/pi/e-badge-web/app.py
+
+[Install]
+WantedBy=multi-user.target
