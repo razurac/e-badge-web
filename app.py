@@ -332,8 +332,6 @@ time.sleep(2)
 def welcome():
     text = "Startup Completed"
     pic = text_writer(text=text)
-    hostname=socket.gethostname()   
-    IPAddr=socket.gethostbyname(hostname)
     pic = text_writer(text="Open Web-UI: " + get_ip()+":"+str(config["port"]), location=[0,25], pic=pic)
     job = {"type":"raw_display", "raw_picture": pic}
     displayQueue.put(job)
