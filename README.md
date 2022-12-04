@@ -1,8 +1,12 @@
 # e-badge-web
 webinterface to control e-paper display
 
-## Setup
-### Install Dependencies
+# Description
+This web app allows you to control a waveshare 4.2 in black and red e-Paper display via a web-ui.
+It's a sucessor to my [e-badge](https://github.com/razurac/e-badge) project and aims to be more user friendly.
+
+# Setup
+## Install Dependencies
     
     # System dependencies
     apt install git python3-venv libopenjp2-7
@@ -17,13 +21,13 @@ webinterface to control e-paper display
     git clone https://github.com/waveshare/e-Paper.git
     pip install e-Paper/RaspberryPi_JetsonNano/python/
 
-### Enable Interfaces
+## Enable Interfaces
 
     # SPI
     sudo raspi-config
     -> Interface Options -> SPI -> yes -> ok -> finish
 
-### (optional) Auto start on boot
+## (optional) Auto start on boot
 This assumes you are using user "pi". If you are running as a different user, change all files and commands
 accordingly.
 
@@ -32,5 +36,5 @@ accordingly.
     cp /home/pi/e-badge-web/autostart/epd-web.service ~/.local/share/systemd/user/
     systemctl --user enable --now epd-web.service
 
-## Usage
+# Usage
 Open Web-Ui at address dispplayed by the e-paper
