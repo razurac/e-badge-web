@@ -25,7 +25,7 @@ defaults = {"location": [0,0],
 
 config =   {"host": "0.0.0.0",
             "port": 8080,
-            "ALLOWED_EXTENSIONS_GENERAL": set(['png', 'jpg', 'jpeg']),
+            "ALLOWED_EXTENSIONS_GENERAL": set(['png', 'jpg', 'jpeg', 'webp']),
             "ALLOWED_EXTENSIONS_PREPARED": set(['bmp'])}
 
 # Objects
@@ -150,13 +150,11 @@ def push_image(pic, swap=False):
         image_b, image_r = image_r, image_b
 
     try:
-        epd = epd4in2b.EPD()
         epd.init()
         epd.display(epd.getbuffer(image_b), epd.getbuffer(image_r))
         epd.sleep()
     except:
         print('traceback.format_exc():\n%s', traceback.format_exc())
-        epd = epd4in2b.EPD()
         epd.sleep()
         exit()
 
@@ -323,6 +321,10 @@ def clear():
 ####
 # Startup Sequence
 ####
+
+# prepare folders
+if not os.path.exists('images'):
+   os.makedirs('images')
 
 # Queue Handler
 threading.Thread(target=queue_handler).start()
