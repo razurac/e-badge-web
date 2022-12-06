@@ -6,11 +6,15 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 import sys
 import os
 from pprint import pprint
+from picamera2 import Picamera2
+from libcamera import Transform
 import time
+from datetime import datetime
 import threading
 import traceback
 import queue
 import socket
+import uuid
 from waveshare_epd import epd4in2b_V2 as epd4in2b
 
 ####
@@ -32,6 +36,7 @@ config =   {"host": "0.0.0.0",
 
 epd = epd4in2b.EPD()
 displayQueue = queue.Queue()
+picam2 = Picamera2()
 
 
 ####
@@ -205,9 +210,18 @@ def queue_handler():
             elif job["type"] == "convert":
                 print("Convert image")
                 file = job["file"]
-                threshold = int(job["options"]["threshold"])
-                threshold_off = int(job["options"]["threshold_off"])
-                rotation = int(job["options"]["rotation"])
+                if "threshold" in job["options"]:
+                    threshold = int(job["options"]["threshold"])
+                else:
+                    threshold = 125
+                if "threshold_off" in job["options"]:
+                    threshold_off = int(job["options"]["threshold_off"])
+                else:
+                    threshold_off = 0
+                if "rotation" in job["options"]:
+                    rotation = int(job["options"]["rotation"])
+                else:
+                    rotation = 0
                 if "bicolor" in job["options"]:
                     bicolor = True
                 else:
@@ -310,6 +324,32 @@ def converterUpload():
         print("No file selected or invalid file type")
         return 'No file selected or invalid file type',400
 
+
+# Add photo routes
+@application.route('/camera')
+def camera():
+    return render_template('camera.html')
+
+@application.route('/camera', methods=['POST'])
+def cameraTakePic():
+    try:
+        now = datetime.now()
+        date_time = now.strftime("%m-%d-%Y")
+        filename = date_time + "-" + uuid.uuid4().hex[:5] + ".png"
+        picam2.capture_file(os.path.join("images/", filename))
+        job = {}
+        job["file"] = os.path.join("images/", filename)
+        job["options"] = {"dither": "True", "bicolor": "True"}
+        job["type"] = "convert"
+        displayQueue.put(job)
+        return redirect(request.url)
+    except:
+        print("Error when taking picture")
+        return 'Error when taking picture',500
+
+
+
+
 #Add clear route
 @application.route('/clear')
 def clear():
@@ -325,6 +365,12 @@ def clear():
 # prepare folders
 if not os.path.exists('images'):
    os.makedirs('images')
+
+# Init picamera
+
+camera_config = picam2.create_preview_configuration(transform=Transform(hflip=True, vflip=True))
+picam2.configure(camera_config)
+picam2.start(show_preview=False)
 
 # Queue Handler
 threading.Thread(target=queue_handler).start()
