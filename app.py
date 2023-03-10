@@ -32,12 +32,6 @@ config =   {"host": "0.0.0.0",
             "ALLOWED_EXTENSIONS_GENERAL": set(['png', 'jpg', 'jpeg', 'webp']),
             "ALLOWED_EXTENSIONS_PREPARED": set(['bmp'])}
 
-# Objects
-
-epd = epd4in2b.EPD()
-displayQueue = queue.Queue()
-picam2 = Picamera2()
-
 
 ####
 # Helpers
@@ -368,11 +362,19 @@ if not os.path.exists('images'):
 
 # Init picamera
 
-camera_config = picam2.create_preview_configuration(transform=Transform(hflip=True, vflip=True))
-picam2.configure(camera_config)
-picam2.start(show_preview=False)
+try:
+    picam2 = Picamera2()
+    camera_config = picam2.create_preview_configuration(transform=Transform(hflip=True, vflip=True))
+    picam2.configure(camera_config)
+    picam2.start(show_preview=False)
+except:
+    pass
 
-# Queue Handler
+# Init epd
+epd = epd4in2b.EPD()
+
+# Init Handler
+displayQueue = queue.Queue()
 threading.Thread(target=queue_handler).start()
 time.sleep(2)
 
