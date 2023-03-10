@@ -79,8 +79,17 @@ def get_ip():
 
 # Converter for Images
 
-def convert_image(file, rotation, bw):
-    image = Image.open(file)
+def convert_image(file="", image="",  rotation=0, bw=False):
+
+    if file != "":
+        image = Image.open(file)
+    elif image != "":
+        pass
+    else:
+        print("Converter didn't get any valid image")
+        return
+
+
     image = image.convert('RGB',dither=Image.Dither.NONE)
     size = (epd_lib.EPD_WIDTH, epd_lib.EPD_HEIGHT)
     if rotation == 90:
@@ -203,7 +212,8 @@ def queue_handler():
             elif job["type"] == "raw_display":
                 print("Show raw image")
                 raw_picture = job["raw_picture"]
-                push_image(raw_picture)
+                converted_pic = convert_image(image=raw_picture)
+                push_image(converted_pic)
                 print("Image displayed")
             else:
                 pass
