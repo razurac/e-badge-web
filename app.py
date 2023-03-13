@@ -149,6 +149,8 @@ def push_image(image, swap=False):
             image_b, image_r = image_r, image_b
         try:
             epd.init()
+            epd.send_command(0x50)
+            epd.send_data(0x37)
             epd.display(epd.getbuffer(image_b), epd.getbuffer(image_r))
             epd.sleep()
         except:
@@ -157,6 +159,8 @@ def push_image(image, swap=False):
             exit()
     elif config["display_type"] == "acep":
         epd.init()
+        epd.send_command(0x50)
+        epd.send_data(0x17)
         epd.display(epd.getbuffer(image))
         epd.sleep()
 
