@@ -137,6 +137,8 @@ def convert_image(file="", image="",  rotation=0, bw=False):
             image_b = image.convert('L',dither=Image.Dither.FLOYDSTEINBERG)
         return image_b, image_r
     elif config["display_type"] == "acep":
+        if bw:
+            image = image.convert('L')
         return image
 
 
