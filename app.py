@@ -283,7 +283,7 @@ def cameraTakePic():
         picam2.capture_file(os.path.join("images/", filename))
         job = {}
         job["file"] = os.path.join("images/", filename)
-        job["options"] = {"rotation": 0, "bw": "False"}
+        job["options"] = {"rotation": 0}
         job["type"] = "display"
         displayQueue.put(job)
         return redirect(request.url)
