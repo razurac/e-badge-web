@@ -400,7 +400,7 @@ def welcome():
     image = text_writer(text="Open Web-UI: " + get_ip()+":"+str(config["port"]), location=[0,25], image=image)
     job = {"type":"raw_display", "raw_picture": image}
     displayQueue.put(job)
-# welcome()
+welcome()
 
 # Web-Frontend
 application.run(host=config["host"], port=config["port"])
