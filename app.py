@@ -15,6 +15,7 @@ import traceback
 import queue
 import socket
 import uuid
+import random
 
 ####
 #  Setup
@@ -29,7 +30,8 @@ defaults = {"location": [0,0],
 config =   {"host": "0.0.0.0",
             "port": 8080,
             "ALLOWED_EXTENSIONS_GENERAL": set(['png', 'jpg', 'jpeg', 'webp', 'bmp']),
-            "display_model": "epd5in65f"}
+            "display_model": "epd5in65f",
+            "slideshow_timer": 10}
 
 # Display adjustment
 
@@ -43,10 +45,19 @@ else:
     print("Unknown display type")
 
 
-# Objects
-
+# Init EPD
 epd = epd_lib.EPD()
+
+# Queues
 displayQueue = queue.Queue()
+
+# Events
+slideshowEnabled = threading.Event()
+displayActive = threading.Event()
+
+
+# Multi Thread Lists
+imageList = []
 
 
 ####
@@ -191,12 +202,35 @@ def text_writer(text,size=defaults["text_size"],font_file=defaults["font_file"],
     
     return image
 
+# Slideshow handler
+
+def slideshow_handler():
+    while True:
+        slideshowEnabled.wait()
+        for filename in imageList:
+            if not slideshowEnabled.is_set():
+                break
+            print("Next Slideshow Image" + filename)
+            job = {}
+            job["file"] = os.path.join("tmp_images/", filename)
+            job["options"] = {"rotation": 0}
+            job["type"] = "display"
+            displayQueue.put(job)
+            time.sleep(2)            
+            while displayActive.is_set() or not displayQueue.empty():
+                pass
+            time.sleep(config["slideshow_timer"])
+
+
+
+
 # DisplayQueue handler
 
 def queue_handler():
     while True:
         try:
             job = displayQueue.get()
+            displayActive.set()
             if job["type"] == "clear":
                 print("Clear Screen")
 
@@ -230,7 +264,7 @@ def queue_handler():
         except:
           print('traceback.format_exc():\n%s', traceback.format_exc())
           continue
-        time.sleep(5)
+        displayActive.clear()
 
      
 ####
@@ -252,14 +286,15 @@ def converter():
 
 @application.route('/display', methods=['POST'])
 def converterUpload():
+    slideshowEnabled.clear()
     if 'file' not in request.files:
         print("No file in request")
         return 'No file in request',400
     file = request.files['file']
     if file.filename != '' and allowed_file(file.filename, config["ALLOWED_EXTENSIONS_GENERAL"]):
-        file.save(os.path.join("images/", file.filename))
+        file.save(os.path.join("tmp_images/", file.filename))
         job = {}
-        job["file"] = os.path.join("images/", file.filename)
+        job["file"] = os.path.join("tmp_images/", file.filename)
         job["options"] = request.form
         job["type"] = "display"
         displayQueue.put(job)
@@ -277,12 +312,13 @@ def camera():
 @application.route('/camera', methods=['POST'])
 def cameraTakePic():
     try:
+        slideshowEnabled.clear()
         now = datetime.now()
         date_time = now.strftime("%m-%d-%Y")
         filename = date_time + "-" + uuid.uuid4().hex[:5] + ".png"
-        picam2.capture_file(os.path.join("images/", filename))
+        picam2.capture_file(os.path.join("tmp_images/", filename))
         job = {}
-        job["file"] = os.path.join("images/", filename)
+        job["file"] = os.path.join("tmp_images/", filename)
         job["options"] = {"rotation": 0}
         job["type"] = "display"
         displayQueue.put(job)
@@ -291,12 +327,38 @@ def cameraTakePic():
         print("Error when taking picture")
         return 'Error when taking picture',500
 
+@application.route('/slideshow')
+def slideshowMainPage():
+    return render_template('slideshow.html')
+
+@application.route('/slideshow', methods=['POST'])
+def slideshowToggle():
+    try:
+        if not slideshowEnabled.is_set():
+            print("Enable slideshow")
+            displayQueue.queue.clear
+            dir_path = r'slideshow'
+            for file in os.listdir(dir_path):
+                if os.path.isfile(os.path.join(dir_path, file)) and allowed_file(file, config["ALLOWED_EXTENSIONS_GENERAL"]):
+                    imageList.append(os.path.abspath(os.path.join(dir_path, file)))
+                    random.shuffle(imageList)
+            slideshowEnabled.set()
+        else:
+            print("Disable slideshow")
+            slideshowEnabled.clear()
+        return redirect(request.url)
+    except:
+        print("Error when toggle slideshow")
+        return 'Error when toggle slideshow',500
+
+
 
 
 
 #Add clear route
 @application.route('/clear')
 def clear():
+    slideshowEnabled.clear()
     job = {"type": "clear"}
     displayQueue.put(job)
     return redirect("/")
@@ -307,8 +369,11 @@ def clear():
 ####
 
 # prepare folders
-if not os.path.exists('images'):
-   os.makedirs('images')
+if not os.path.exists('tmp_images'):
+   os.makedirs('tmp_images')
+
+if not os.path.exists('slideshow'):
+   os.makedirs('slideshow')
 
 # Init picamera
 
@@ -319,6 +384,10 @@ try:
     picam2.start(show_preview=False)
 except:
     pass
+
+# Slideshow Handler
+threading.Thread(target=slideshow_handler).start()
+time.sleep(2)
 
 # Queue Handler
 threading.Thread(target=queue_handler).start()
@@ -331,7 +400,7 @@ def welcome():
     image = text_writer(text="Open Web-UI: " + get_ip()+":"+str(config["port"]), location=[0,25], image=image)
     job = {"type":"raw_display", "raw_picture": image}
     displayQueue.put(job)
-welcome()
+# welcome()
 
 # Web-Frontend
 application.run(host=config["host"], port=config["port"])
